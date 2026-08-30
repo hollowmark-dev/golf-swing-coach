@@ -33,14 +33,21 @@ export function init(root) {
   const guideOverlay = root.querySelector('#capture-guide-overlay');
   const guideVideo = root.querySelector('#guide-video');
   const closeGuideBtn = root.querySelector('#close-guide-btn');
+  const guideWarningEl = root.querySelector('#guide-warning');
 
   openGuideBtn.addEventListener('click', async () => {
     // alert()はブラウザによって表示が抑制される場合があるため、
     // 画面内のステータス表示でフィードバックする。
     openGuideBtn.disabled = true;
+    guideWarningEl.hidden = true;
     setStatus('カメラを起動しています…');
     try {
-      await openCaptureGuide(guideOverlay, guideVideo);
+      await openCaptureGuide(guideOverlay, guideVideo, (message) => {
+        // ガイドは全画面オーバーレイでcapture-statusを覆い隠すため、
+        // 警告はオーバーレイ内の専用エリアに表示する。
+        guideWarningEl.textContent = message;
+        guideWarningEl.hidden = false;
+      });
       statusEl.hidden = true;
     } catch (err) {
       setStatus(err.message || String(err), true);

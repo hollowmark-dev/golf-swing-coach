@@ -342,6 +342,18 @@ button:disabled {
   transform: translate(-50%, -50%);
 }
 
+.guide-warning {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 12px;
+  background: rgba(224, 102, 79, 0.92);
+  color: #fff;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
 .guide-instructions {
   position: absolute;
   left: 0;
