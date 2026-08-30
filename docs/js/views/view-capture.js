@@ -19,6 +19,42 @@ export function init(root) {
     statusEl.classList.toggle('status-error', isError);
   }
 
+  // 解析中に端末が自動でスリープ/画面ロックしてしまうと、ブラウザがタブの処理を
+  // 大幅に遅延・停止させることがある。画面がロックされる主な原因である「無操作
+  // による自動スリープ」だけは、Wake Lockでこの間だけ防ぐ。
+  // (ユーザーが手動で電源ボタンを押す・他アプリに切り替える場合は防げない。
+  //  これはOS/ブラウザ側の省電力制御であり、Web側からは制御できない領域)
+  let wakeLock = null;
+
+  async function acquireWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+      }
+    } catch (err) {
+      console.warn('wake lock request failed', err);
+    }
+  }
+
+  async function releaseWakeLock() {
+    if (!wakeLock) return;
+    try {
+      await wakeLock.release();
+    } catch (err) {
+      // すでに解放済み等は無視してよい
+    }
+    wakeLock = null;
+  }
+
+  // タブが再びフォアグラウンドに戻った際、Wake Lockは自動では再取得されない
+  // (仕様上、非表示になった時点で自動解放される)ため、解析中であれば取り直す。
+  let analyzing = false;
+  document.addEventListener('visibilitychange', () => {
+    if (analyzing && document.visibilityState === 'visible' && !wakeLock) {
+      acquireWakeLock();
+    }
+  });
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const file = fileInput.files[0];
@@ -30,6 +66,8 @@ export function init(root) {
 
     const cameraAngle = angleSelect.value;
     let session;
+    analyzing = true;
+    await acquireWakeLock();
     try {
       session = await createSession({ cameraAngle, note: noteInput.value });
       await saveVideoBlob(session.id, file);
@@ -74,6 +112,8 @@ export function init(root) {
       setStatus(`エラーが発生しました: ${err.message || err}`, true);
     } finally {
       submitBtn.disabled = false;
+      analyzing = false;
+      await releaseWakeLock();
     }
   });
 }

@@ -91,13 +91,16 @@ export async function analyzeVideo(blob, { onProgress = () => {} } = {}) {
   const results = [];
   let frameCount = 0;
   let decodeError = null;
+  let decoder = null;
+  let videoTrackInfo = null;
 
   const mp4boxFile = createMp4BoxFile();
 
-  const decodedDone = new Promise((resolve, reject) => {
-    let decoder = null;
-    let videoTrackInfo = null;
-
+  // mp4box.jsには「全サンプルの処理が終わった」ことを通知するコールバックは
+  // 存在しない(onFlushというイベントは実在しない)。ここではonReady(または
+  // onError)が呼ばれた時点までしか待たない。実際のデコード完了は、この後
+  // 別途 VideoDecoder.flush() を明示的に待つことで検知する。
+  const readyOrError = new Promise((resolve, reject) => {
     mp4boxFile.onError = (err) => reject(new Error(`mp4box error: ${err}`));
 
     mp4boxFile.onReady = (info) => {
@@ -152,6 +155,11 @@ export async function analyzeVideo(blob, { onProgress = () => {} } = {}) {
 
       mp4boxFile.setExtractionOptions(videoTrackInfo.id, null, { nbSamples: Infinity });
       mp4boxFile.start();
+
+      // デコーダの設定・サンプル抽出の開始まで完了した時点で「準備完了」とする。
+      // 実際のデコード完了(全フレームの処理)はこの後、decoder.flush()を
+      // 明示的に待って検知する(下記参照)。
+      resolve();
     };
 
     mp4boxFile.onSamples = (trackId, ref, samples) => {
@@ -166,27 +174,11 @@ export async function analyzeVideo(blob, { onProgress = () => {} } = {}) {
         try {
           decoder.decode(chunk);
         } catch (err) {
-          reject(err);
-          return;
+          // この時点でreadyOrErrorは既に解決済みの可能性があるため、
+          // ここでrejectしても呼び出し元には伝わらない。decodeErrorに
+          // 記録し、後段のdecoder.flush()待ちの後でまとめて判定する。
+          if (!decodeError) decodeError = err;
         }
-      }
-    };
-
-    mp4boxFile.onFlush = async () => {
-      try {
-        if (decoder && decoder.state === 'configured') {
-          await decoder.flush();
-        }
-      } catch (err) {
-        // decoder.flush()自体の例外より、VideoDecoderのerrorコールバックが
-        // 既に捕捉していたdecodeError(より具体的な失敗原因)を優先する。
-        if (!decodeError) decodeError = err;
-      }
-
-      if (decodeError) {
-        reject(decodeError);
-      } else {
-        resolve();
       }
     };
   });
@@ -196,7 +188,22 @@ export async function analyzeVideo(blob, { onProgress = () => {} } = {}) {
   mp4boxFile.appendBuffer(arrayBuffer);
   mp4boxFile.flush();
 
-  await decodedDone;
+  await readyOrError;
+
+  // mp4box.js自体には「全サンプルの処理が終わった」ことを通知する仕組みが
+  // ないため、WebCodecs側のVideoDecoder.flush()を明示的に待つことで
+  // 全フレームのデコード完了(=outputコールバックが出尽くしたこと)を検知する。
+  try {
+    if (decoder && decoder.state === 'configured') {
+      await decoder.flush();
+    }
+  } catch (err) {
+    if (!decodeError) decodeError = err;
+  }
+
+  if (decodeError) {
+    throw decodeError instanceof Error ? decodeError : new Error(String(decodeError));
+  }
 
   if (results.length === 0) {
     throw new Error('骨格を1フレームも抽出できませんでした。動画の形式が対応していない可能性があります。');
