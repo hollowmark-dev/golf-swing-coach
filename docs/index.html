@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ゴルフスイング分析</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>ゴルフスイング分析</h1>
+    <nav class="tabs">
+      <a href="#capture" data-route="capture">撮影</a>
+      <a href="#history" data-route="history">履歴</a>
+    </nav>
+  </header>
+
+  <main id="app"></main>
+
+  <!-- ==================== 撮影ビュー ==================== -->
+  <template id="tpl-view-capture">
+    <section class="view view-capture">
+      <h2>スイングを撮影・取り込み</h2>
+      <p class="hint">
+        スマホの純正カメラアプリで<strong>スローモーション(120fps以上)</strong>で撮影した動画を選んでください。
+        通常の速度で撮った動画では、インパクトの瞬間が数フレームしか記録されず、精度が出ません。
+      </p>
+
+      <form id="capture-form">
+        <label class="field">
+          <span>動画ファイル</span>
+          <input type="file" id="video-input" accept="video/*" capture="environment" required />
+        </label>
+
+        <label class="field">
+          <span>撮影アングル</span>
+          <select id="camera-angle">
+            <option value="front">正面(球の飛ぶ方向を横から見て自分の正面)</option>
+            <option value="behind">後方(飛球線の後ろから)</option>
+            <option value="other">その他</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>メモ(任意)</span>
+          <input type="text" id="capture-note" placeholder="例: 7番アイアン、練習場" />
+        </label>
+
+        <button type="submit" id="capture-submit">保存して解析する</button>
+      </form>
+
+      <div id="capture-status" class="status" hidden></div>
+      <div id="capture-result" class="result" hidden></div>
+    </section>
+  </template>
+
+  <!-- ==================== 履歴ビュー ==================== -->
+  <template id="tpl-view-history">
+    <section class="view view-history">
+      <h2>履歴</h2>
+      <p class="hint" id="history-empty-hint">まだ記録がありません。「撮影」タブから最初の1本を取り込んでみましょう。</p>
+      <ul id="history-list" class="session-list"></ul>
+    </section>
+  </template>
+
+  <!-- ==================== 詳細ビュー ==================== -->
+  <template id="tpl-view-detail">
+    <section class="view view-detail">
+      <a href="#history" class="back-link">← 履歴に戻る</a>
+      <h2 id="detail-title">セッション詳細</h2>
+
+      <div class="video-wrap">
+        <video id="detail-video" controls playsinline></video>
+        <canvas id="detail-overlay"></canvas>
+      </div>
+
+      <div id="detail-metrics" class="metrics"></div>
+      <div id="detail-advice" class="advice"></div>
+    </section>
+  </template>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

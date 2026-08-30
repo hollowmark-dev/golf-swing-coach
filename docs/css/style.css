@@ -1,0 +1,234 @@
+:root {
+  --color-bg: #0f1512;
+  --color-surface: #182119;
+  --color-surface-alt: #202b22;
+  --color-border: #2c392f;
+  --color-text: #eaf0ea;
+  --color-text-dim: #9fb0a3;
+  --color-accent: #5fd97a;
+  --color-accent-dim: #2f7a45;
+  --color-danger: #e0664f;
+  --radius: 10px;
+  --gap: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  padding: 12px 16px 0;
+}
+
+.app-header h1 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tabs a {
+  flex: 1;
+  text-align: center;
+  padding: 10px 0;
+  color: var(--color-text-dim);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  font-size: 0.95rem;
+}
+
+.tabs a.active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+#app {
+  padding: 16px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding-bottom: 64px;
+}
+
+.view h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.hint {
+  color: var(--color-text-dim);
+  font-size: 0.9rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.field span {
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+}
+
+input, select, button {
+  font: inherit;
+  color: inherit;
+}
+
+input[type="text"],
+input[type="password"],
+select {
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+input[type="file"] {
+  background: var(--color-surface-alt);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+button {
+  background: var(--color-accent);
+  color: #06210d;
+  border: none;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-weight: 600;
+  width: 100%;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: var(--color-accent-dim);
+  color: var(--color-text-dim);
+  cursor: not-allowed;
+}
+
+.status {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 0.9rem;
+  white-space: pre-line;
+}
+
+.status.status-error {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.result {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session-list li a {
+  display: block;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.session-list .session-date {
+  font-weight: 600;
+}
+
+.session-list .session-meta {
+  color: var(--color-text-dim);
+  font-size: 0.85rem;
+}
+
+.back-link {
+  color: var(--color-text-dim);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.video-wrap {
+  position: relative;
+  margin: 12px 0;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.video-wrap video {
+  width: 100%;
+  display: block;
+}
+
+.video-wrap canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.metrics, .advice {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.metrics dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+}
+
+.advice ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.advice li {
+  margin-bottom: 8px;
+}
