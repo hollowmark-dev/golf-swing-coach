@@ -76,6 +76,18 @@ export async function listSessions() {
   return all.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
+// セッション本体と、それに紐づくlandmarks/metrics/adviceのレコードをすべて削除する。
+// (動画本体(OPFS)は呼び出し側でstorage-opfs.deleteVideoBlob()を別途呼ぶ必要がある)
+export async function deleteSession(sessionId) {
+  const db = await getDB();
+  await Promise.all([
+    db.delete('sessions', sessionId),
+    db.delete('landmarks', sessionId),
+    db.delete('metrics', sessionId),
+    db.delete('advice', sessionId),
+  ]);
+}
+
 // ---- landmarks ----
 
 export async function saveLandmarks(sessionId, frames) {

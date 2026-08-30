@@ -34,19 +34,16 @@ function getPoseLandmarker(onProgress) {
   if (!poseLandmarkerPromise) {
     poseLandmarkerPromise = (async () => {
       const vision = await FilesetResolver.forVisionTasks(WASM_BASE_URL);
-      try {
-        return await PoseLandmarker.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
-          runningMode: 'VIDEO',
-        });
-      } catch (err) {
-        // 一部の端末/ブラウザではGPUデリゲートが不安定なためCPUにフォールバックする。
-        onProgress('GPUデリゲートの初期化に失敗したためCPUで再試行します');
-        return PoseLandmarker.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: MODEL_URL, delegate: 'CPU' },
-          runningMode: 'VIDEO',
-        });
-      }
+      // GPU(WebGL)デリゲートは高速だが、一部のブラウザ(例: プライバシー保護の
+      // ためWebGLの挙動を制限するBrave)では初期化がエラーにならず無限に応答が
+      // 返ってこない(ハングする)ことが実機検証で確認された。エラーにならない
+      // 以上try/catchによるフォールバックも機能しないため、Phase 1では最初から
+      // CPUデリゲートのみを使い、確実に動くことを優先する。
+      onProgress('姿勢推定モデルを準備しています…');
+      return PoseLandmarker.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: MODEL_URL, delegate: 'CPU' },
+        runningMode: 'VIDEO',
+      });
     })();
   }
   return poseLandmarkerPromise;
