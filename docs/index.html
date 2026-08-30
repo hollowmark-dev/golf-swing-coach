@@ -27,6 +27,11 @@
         撮影が終わったらこの画面に戻り、下のボタンから今撮った動画(またはギャラリー内の動画)を選んでください。
       </p>
 
+      <button type="button" id="open-guide-btn" class="secondary-button">📐 撮影ガイドを表示(カメラ位置合わせ)</button>
+      <p class="hint hint-small">
+        毎回同じ位置から撮ると、指標の比較がより正確になります。位置合わせだけこのガイドで行い、実際の録画は純正カメラアプリで行ってください。
+      </p>
+
       <form id="capture-form">
         <label class="field">
           <span>動画ファイル</span>
@@ -52,6 +57,18 @@
 
       <div id="capture-status" class="status" hidden></div>
       <div id="capture-result" class="result" hidden></div>
+
+      <div id="capture-guide-overlay" class="guide-overlay" hidden>
+        <video id="guide-video" autoplay playsinline muted></video>
+        <div class="guide-line guide-line-vertical"></div>
+        <div class="guide-line guide-line-head"></div>
+        <div class="guide-marker-ball"></div>
+        <div class="guide-instructions">
+          <p>上のラインに<strong>頭の高さ</strong>、下の丸に<strong>ボールの位置</strong>を合わせて、カメラ(三脚)を設置してください。</p>
+          <p>位置が決まったら、スマホの<strong>純正カメラアプリ</strong>に切り替えてスローモーションで撮影してください。</p>
+          <button type="button" id="close-guide-btn">閉じる</button>
+        </div>
+      </div>
     </section>
   </template>
 

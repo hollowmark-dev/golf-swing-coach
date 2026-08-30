@@ -81,6 +81,12 @@ html, body {
   padding: 10px 12px;
 }
 
+.hint-small {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  padding: 8px 10px;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -288,4 +294,69 @@ button:disabled {
   display: block;
   width: 100%;
   height: 48px;
+}
+
+.guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #000;
+}
+
+.guide-overlay video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.guide-line {
+  position: absolute;
+  background: rgba(95, 217, 122, 0.85);
+}
+
+.guide-line-vertical {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-1px);
+}
+
+.guide-line-head {
+  top: 15%;
+  left: 0;
+  right: 0;
+  height: 2px;
+}
+
+.guide-marker-ball {
+  position: absolute;
+  left: 50%;
+  top: 68%;
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(95, 217, 122, 0.95);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.guide-instructions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+  background: rgba(15, 21, 18, 0.92);
+  color: var(--color-text);
+}
+
+.guide-instructions p {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.guide-instructions button {
+  width: 100%;
 }

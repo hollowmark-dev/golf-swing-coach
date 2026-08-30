@@ -12,6 +12,7 @@ import { analyzeVideo } from '../pose/pipeline.js';
 import { detectImpactTimestamp } from '../audio/impact-detect.js';
 import { computeFullMetrics, computeTempoRatio } from '../metrics/metrics-full.js';
 import { generateFullAdvice } from '../advice/rules-full.js';
+import { openCaptureGuide, closeCaptureGuide } from '../capture-guide.js';
 
 export function init(root) {
   const form = root.querySelector('#capture-form');
@@ -21,6 +22,23 @@ export function init(root) {
   const submitBtn = root.querySelector('#capture-submit');
   const statusEl = root.querySelector('#capture-status');
   const resultEl = root.querySelector('#capture-result');
+
+  const openGuideBtn = root.querySelector('#open-guide-btn');
+  const guideOverlay = root.querySelector('#capture-guide-overlay');
+  const guideVideo = root.querySelector('#guide-video');
+  const closeGuideBtn = root.querySelector('#close-guide-btn');
+
+  openGuideBtn.addEventListener('click', async () => {
+    try {
+      await openCaptureGuide(guideOverlay, guideVideo);
+    } catch (err) {
+      alert(err.message || String(err));
+    }
+  });
+
+  closeGuideBtn.addEventListener('click', () => {
+    closeCaptureGuide(guideOverlay);
+  });
 
   function setStatus(message, isError = false) {
     statusEl.hidden = false;
@@ -58,11 +76,12 @@ export function init(root) {
   // タブが再びフォアグラウンドに戻った際、Wake Lockは自動では再取得されない
   // (仕様上、非表示になった時点で自動解放される)ため、解析中であれば取り直す。
   let analyzing = false;
-  document.addEventListener('visibilitychange', () => {
+  function handleVisibilityChange() {
     if (analyzing && document.visibilityState === 'visible' && !wakeLock) {
       acquireWakeLock();
     }
-  });
+  }
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -132,4 +151,9 @@ export function init(root) {
       await releaseWakeLock();
     }
   });
+
+  return function cleanup() {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    closeCaptureGuide(guideOverlay);
+  };
 }
