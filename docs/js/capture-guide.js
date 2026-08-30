@@ -45,6 +45,15 @@ export async function openCaptureGuide(overlayEl, videoEl) {
   activeStream = stream;
   videoEl.srcObject = stream;
   overlayEl.hidden = false;
+
+  // <video autoplay>属性だけでは自動再生されない環境があるため、
+  // srcObjectを設定した後に明示的にplay()を呼ぶ。play()自体が失敗しても
+  // (稀なケース)ガイド表示自体は続行してよいので、ここでは握りつぶす。
+  try {
+    await videoEl.play();
+  } catch (err) {
+    console.warn('guide video play() failed', err);
+  }
 }
 
 export function closeCaptureGuide(overlayEl) {
