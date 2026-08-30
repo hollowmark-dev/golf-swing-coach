@@ -1,8 +1,17 @@
-import { createSession, updateSessionStatus, saveMetrics, saveLandmarks, saveAdvice, listMetricsForAngle } from '../db.js';
+import {
+  createSession,
+  updateSessionStatus,
+  updateSessionImpact,
+  saveMetrics,
+  saveLandmarks,
+  saveAdvice,
+  listMetricsForAngle,
+} from '../db.js';
 import { saveVideoBlob, deleteVideoBlob } from '../storage-opfs.js';
 import { analyzeVideo } from '../pose/pipeline.js';
-import { computeBasicMetrics } from '../metrics/metrics-basic.js';
-import { generateBasicAdvice } from '../advice/rules-basic.js';
+import { detectImpactTimestamp } from '../audio/impact-detect.js';
+import { computeFullMetrics, computeTempoRatio } from '../metrics/metrics-full.js';
+import { generateFullAdvice } from '../advice/rules-full.js';
 
 export function init(root) {
   const form = root.querySelector('#capture-form');
@@ -75,17 +84,24 @@ export function init(root) {
       await updateSessionStatus(session.id, 'analyzing');
       setStatus('骨格を抽出しています(初回はモデルの読み込みに時間がかかります)…');
 
-      const frames = await analyzeVideo(file, {
-        onProgress: (message) => setStatus(message),
-      });
+      // 骨格抽出(動画)と、インパクト音の検出(音声)は互いに独立した処理なので
+      // 並行して実行する。
+      const [frames, impactTimestampMs] = await Promise.all([
+        analyzeVideo(file, { onProgress: (message) => setStatus(message) }),
+        detectImpactTimestamp(file),
+      ]);
 
       await saveLandmarks(session.id, frames);
+      if (impactTimestampMs != null) {
+        await updateSessionImpact(session.id, impactTimestampMs);
+      }
 
-      const metrics = computeBasicMetrics(frames);
+      const metrics = computeFullMetrics(frames);
+      metrics.tempoRatio = computeTempoRatio(frames, impactTimestampMs);
       await saveMetrics(session.id, metrics);
 
       const previous = await listMetricsForAngle(cameraAngle, session.id);
-      const advice = generateBasicAdvice(metrics, previous);
+      const advice = generateFullAdvice(metrics, previous);
       await saveAdvice(session.id, { ruleBased: advice });
 
       await updateSessionStatus(session.id, 'done');

@@ -65,6 +65,14 @@ export async function updateSessionStatus(sessionId, status) {
   await db.put('sessions', session);
 }
 
+export async function updateSessionImpact(sessionId, impactTimestampMs) {
+  const db = await getDB();
+  const session = await db.get('sessions', sessionId);
+  if (!session) return;
+  session.impactTimestampMs = impactTimestampMs;
+  await db.put('sessions', session);
+}
+
 export async function getSession(sessionId) {
   const db = await getDB();
   return db.get('sessions', sessionId);

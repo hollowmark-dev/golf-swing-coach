@@ -30,6 +30,14 @@ const WASM_BASE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10
 // 再ダウンロード・再初期化が発生しない。
 let poseLandmarkerPromise = null;
 
+// PoseLandmarker.detectForVideo()は、同一インスタンスに対して渡す
+// タイムスタンプが常に単調増加していることを要求する(そうでないと
+// "INVALID_ARGUMENT"で全フレーム失敗する)。上記のモデルキャッシュにより
+// 複数の動画で同じインスタンスを使い回すため、各動画内の相対時刻(0msから
+// 始まる)をそのまま渡すと2本目以降で必ず巻き戻ってしまう。そのため、
+// MediaPipeに渡す時刻だけは動画をまたいで単調増加するカウンタを別途使う。
+let nextDetectTimestampMs = 0;
+
 function getPoseLandmarker(onProgress) {
   if (!poseLandmarkerPromise) {
     poseLandmarkerPromise = (async () => {
@@ -123,9 +131,10 @@ export async function analyzeVideo(blob, { onProgress = () => {} } = {}) {
       decoder = new VideoDecoder({
         output: (frame) => {
           frameCount += 1;
-          const timestampMs = frame.timestamp / 1000;
+          const timestampMs = frame.timestamp / 1000; // 動画内の相対時刻(保存・UI表示用)
+          const detectTimestampMs = nextDetectTimestampMs++; // MediaPipe向けの単調増加タイムスタンプ
           try {
-            const detection = poseLandmarker.detectForVideo(frame, timestampMs);
+            const detection = poseLandmarker.detectForVideo(frame, detectTimestampMs);
             const landmarks = detection.landmarks && detection.landmarks[0] ? detection.landmarks[0] : [];
             results.push({
               tMs: timestampMs,
