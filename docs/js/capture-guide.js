@@ -7,15 +7,38 @@
 //   2. その位置のまま純正カメラアプリに切り替えてスロー撮影する
 //   3. アプリに戻り、撮影した動画をファイル選択で取り込む
 
+const GET_USER_MEDIA_TIMEOUT_MS = 10000;
+
 let activeStream = null;
 
+function withTimeout(promise, ms, timeoutMessage) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(timeoutMessage)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 export async function openCaptureGuide(overlayEl, videoEl) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error('このブラウザはカメラ機能に対応していません。');
+  }
+
   let stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' },
-      audio: false,
-    });
+    stream = await withTimeout(
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }),
+      GET_USER_MEDIA_TIMEOUT_MS,
+      'カメラの起動がタイムアウトしました。ブラウザの設定でカメラの許可がブロックされていないか確認してください。'
+    );
   } catch (err) {
     throw new Error(`カメラを起動できませんでした: ${err.message || err}`);
   }

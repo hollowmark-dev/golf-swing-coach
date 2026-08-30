@@ -23,28 +23,35 @@ export function init(root) {
   const statusEl = root.querySelector('#capture-status');
   const resultEl = root.querySelector('#capture-result');
 
+  function setStatus(message, isError = false) {
+    statusEl.hidden = false;
+    statusEl.textContent = message;
+    statusEl.classList.toggle('status-error', isError);
+  }
+
   const openGuideBtn = root.querySelector('#open-guide-btn');
   const guideOverlay = root.querySelector('#capture-guide-overlay');
   const guideVideo = root.querySelector('#guide-video');
   const closeGuideBtn = root.querySelector('#close-guide-btn');
 
   openGuideBtn.addEventListener('click', async () => {
+    // alert()はブラウザによって表示が抑制される場合があるため、
+    // 画面内のステータス表示でフィードバックする。
+    openGuideBtn.disabled = true;
+    setStatus('カメラを起動しています…');
     try {
       await openCaptureGuide(guideOverlay, guideVideo);
+      statusEl.hidden = true;
     } catch (err) {
-      alert(err.message || String(err));
+      setStatus(err.message || String(err), true);
+    } finally {
+      openGuideBtn.disabled = false;
     }
   });
 
   closeGuideBtn.addEventListener('click', () => {
     closeCaptureGuide(guideOverlay);
   });
-
-  function setStatus(message, isError = false) {
-    statusEl.hidden = false;
-    statusEl.textContent = message;
-    statusEl.classList.toggle('status-error', isError);
-  }
 
   // 解析中に端末が自動でスリープ/画面ロックしてしまうと、ブラウザがタブの処理を
   // 大幅に遅延・停止させることがある。画面がロックされる主な原因である「無操作
