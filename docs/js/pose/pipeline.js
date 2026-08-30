@@ -1,25 +1,36 @@
-// Web Worker: 動画ファイル(ArrayBuffer)を受け取り、
+// 動画ファイル(Blob)を受け取り、
 //   1. mp4box.js でmp4コンテナをデマルチプレクスしてエンコード済みチャンクを取り出す
 //   2. WebCodecs VideoDecoder でデコードしてVideoFrameを得る
 //   3. MediaPipe Tasks Vision の PoseLandmarker で骨格を抽出する
 // という3段のパイプラインを実行する。
 //
+// [メインスレッドで実行している理由]
+// 当初はWeb Worker(type: 'module')内で実行する設計だったが、MediaPipe Tasks
+// Visionの内部実装が(モジュールワーカーでは使えない)importScripts()に依存して
+// おり、"Module scripts don't support importScripts()" で失敗することが実機検証
+// 前のローカル検証で判明した。回避策(クラシックワーカー化・UMDバンドルの利用等)
+// より、まずメインスレッドで動くことを優先しPhase 1はここで実行する。
+// WebCodecsのデコードはコールバックベースで非同期に進むため、単純な同期ループに
+// よるUIフリーズにはならない。
+//
 // [Phase 1の最重要検証ポイント]
 // Android実機のスロー撮影(120/240fps)がどのコーデック/コンテナで出力されるかは
 // 機種依存のため、このファイルは実際のスマホの動画ファイルで単独検証してから
-// 他のビューと繋ぐこと。うまく動かない場合はこのファイル内のログ(postMessageのprogress)
-// を頼りに、どの段階(demux/decode/pose推定)で失敗しているかを切り分ける。
+// 他のビューと繋ぐこと。うまく動かない場合はonProgressで渡される途中経過ログを
+// 頼りに、どの段階(demux/decode/pose推定)で失敗しているかを切り分ける。
 
 import { PoseLandmarker, FilesetResolver } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.20/+esm';
-import MP4Box from 'https://cdn.jsdelivr.net/npm/mp4box/+esm';
+import { createFile as createMp4BoxFile, DataStream } from 'https://cdn.jsdelivr.net/npm/mp4box/+esm';
 
 const MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
 const WASM_BASE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.20/wasm';
 
+// モジュールスコープでキャッシュすることで、2回目以降のcaptureではモデルの
+// 再ダウンロード・再初期化が発生しない。
 let poseLandmarkerPromise = null;
 
-function getPoseLandmarker() {
+function getPoseLandmarker(onProgress) {
   if (!poseLandmarkerPromise) {
     poseLandmarkerPromise = (async () => {
       const vision = await FilesetResolver.forVisionTasks(WASM_BASE_URL);
@@ -30,7 +41,7 @@ function getPoseLandmarker() {
         });
       } catch (err) {
         // 一部の端末/ブラウザではGPUデリゲートが不安定なためCPUにフォールバックする。
-        postProgress('GPUデリゲートの初期化に失敗したためCPUで再試行します');
+        onProgress('GPUデリゲートの初期化に失敗したためCPUで再試行します');
         return PoseLandmarker.createFromOptions(vision, {
           baseOptions: { modelAssetPath: MODEL_URL, delegate: 'CPU' },
           runningMode: 'VIDEO',
@@ -41,10 +52,6 @@ function getPoseLandmarker() {
   return poseLandmarkerPromise;
 }
 
-function postProgress(message) {
-  self.postMessage({ type: 'progress', message });
-}
-
 // avcC/hvcC等のdescriptionボックスをVideoDecoder.configure用に抽出する。
 // (WebCodecs公式サンプルで使われている定番パターン)
 function getDescription(mp4boxFile, trackId) {
@@ -52,7 +59,7 @@ function getDescription(mp4boxFile, trackId) {
   for (const entry of track.mdia.minf.stbl.stsd.entries) {
     const box = entry.avcC || entry.hvcC || entry.vpcC || entry.av1C;
     if (box) {
-      const stream = new MP4Box.DataStream(undefined, 0, MP4Box.DataStream.BIG_ENDIAN);
+      const stream = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
       box.write(stream);
       return new Uint8Array(stream.buffer, 8); // 先頭8バイト(ボックスヘッダー)は除く
     }
@@ -60,15 +67,35 @@ function getDescription(mp4boxFile, trackId) {
   throw new Error('動画のコーデック情報(avcC/hvcC)が見つかりませんでした');
 }
 
-async function analyzeVideo(arrayBuffer, mimeType) {
-  postProgress('動画ファイルを解析しています(コンテナ解析)…');
+// mp4box.js + WebCodecsのこのパイプラインはISO-BMFF(mp4/mov)のみ対応。
+// <input accept="video/*"> は形式を制限しないため、対応外のコンテナ(webm等)を
+// mp4boxに渡すと「mp4box error」という分かりにくいエラーになってしまう。
+// 事前にチェックして分かりやすいエラーメッセージを出す。
+const SUPPORTED_MIME_PREFIXES = ['video/mp4', 'video/quicktime'];
 
-  const poseLandmarker = await getPoseLandmarker();
+function assertSupportedContainer(mimeType) {
+  if (!mimeType) return; // 型が取得できない場合はmp4box側の判定に委ねる
+  if (SUPPORTED_MIME_PREFIXES.some((prefix) => mimeType.startsWith(prefix))) return;
+  throw new Error(
+    `対応していない動画形式です(${mimeType})。スマホの純正カメラアプリで撮影したMP4/MOV形式の動画を使用してください。`
+  );
+}
+
+/**
+ * @param {Blob} blob
+ * @param {{ onProgress?: (message: string) => void }} [options]
+ * @returns {Promise<Array<{tMs:number, points:Array<{x:number,y:number,z:number,visibility:number|null}>}>>}
+ */
+export async function analyzeVideo(blob, { onProgress = () => {} } = {}) {
+  assertSupportedContainer(blob.type);
+  onProgress('動画ファイルを解析しています(コンテナ解析)…');
+
+  const poseLandmarker = await getPoseLandmarker(onProgress);
   const results = [];
   let frameCount = 0;
   let decodeError = null;
 
-  const mp4boxFile = MP4Box.createFile();
+  const mp4boxFile = createMp4BoxFile();
 
   const decodedDone = new Promise((resolve, reject) => {
     let decoder = null;
@@ -83,7 +110,7 @@ async function analyzeVideo(arrayBuffer, mimeType) {
         return;
       }
 
-      postProgress(`動画情報を検出しました(${videoTrackInfo.video.width}x${videoTrackInfo.video.height}, ${info.duration}ms相当)`);
+      onProgress(`動画情報を検出しました(${videoTrackInfo.video.width}x${videoTrackInfo.video.height}, ${info.duration}ms相当)`);
 
       let description;
       try {
@@ -111,7 +138,7 @@ async function analyzeVideo(arrayBuffer, mimeType) {
             frame.close();
           }
           if (frameCount % 10 === 0) {
-            postProgress(`骨格を抽出中… ${frameCount}フレーム処理済み`);
+            onProgress(`骨格を抽出中… ${frameCount}フレーム処理済み`);
           }
         },
         error: (err) => {
@@ -153,17 +180,21 @@ async function analyzeVideo(arrayBuffer, mimeType) {
         if (decoder && decoder.state === 'configured') {
           await decoder.flush();
         }
-        if (decodeError) {
-          reject(decodeError);
-        } else {
-          resolve();
-        }
       } catch (err) {
-        reject(err);
+        // decoder.flush()自体の例外より、VideoDecoderのerrorコールバックが
+        // 既に捕捉していたdecodeError(より具体的な失敗原因)を優先する。
+        if (!decodeError) decodeError = err;
+      }
+
+      if (decodeError) {
+        reject(decodeError);
+      } else {
+        resolve();
       }
     };
   });
 
+  const arrayBuffer = await blob.arrayBuffer();
   arrayBuffer.fileStart = 0;
   mp4boxFile.appendBuffer(arrayBuffer);
   mp4boxFile.flush();
@@ -174,19 +205,6 @@ async function analyzeVideo(arrayBuffer, mimeType) {
     throw new Error('骨格を1フレームも抽出できませんでした。動画の形式が対応していない可能性があります。');
   }
 
-  postProgress(`骨格抽出が完了しました(合計${results.length}フレーム)`);
+  onProgress(`骨格抽出が完了しました(合計${results.length}フレーム)`);
   return results;
 }
-
-self.onmessage = async (event) => {
-  const { type, videoBuffer, mimeType } = event.data;
-  if (type !== 'analyze') return;
-
-  try {
-    const frames = await analyzeVideo(videoBuffer, mimeType);
-    self.postMessage({ type: 'done', frames });
-  } catch (err) {
-    console.error('pose-worker analyze failed', err);
-    self.postMessage({ type: 'error', message: err && err.message ? err.message : String(err) });
-  }
-};

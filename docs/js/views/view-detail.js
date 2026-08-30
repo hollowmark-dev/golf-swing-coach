@@ -30,8 +30,10 @@ export async function init(root, sessionId) {
     getAdvice(sessionId),
   ]);
 
+  let objectUrl = null;
   if (videoFile) {
-    videoEl.src = URL.createObjectURL(videoFile);
+    objectUrl = URL.createObjectURL(videoFile);
+    videoEl.src = objectUrl;
   } else {
     videoEl.replaceWith(document.createTextNode('動画データが見つかりませんでした。'));
   }
@@ -107,4 +109,9 @@ export async function init(root, sessionId) {
   } else {
     adviceEl.innerHTML = '<p>アドバイスがまだありません。</p>';
   }
+
+  return function cleanup() {
+    window.removeEventListener('resize', resizeCanvas);
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  };
 }

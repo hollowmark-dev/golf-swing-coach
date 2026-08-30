@@ -1,6 +1,6 @@
 import { createSession, updateSessionStatus, saveMetrics, saveLandmarks, saveAdvice, listMetricsForAngle } from '../db.js';
-import { saveVideoBlob } from '../storage-opfs.js';
-import { analyzeVideo } from '../pose/pose-client.js';
+import { saveVideoBlob, deleteVideoBlob } from '../storage-opfs.js';
+import { analyzeVideo } from '../pose/pipeline.js';
 import { computeBasicMetrics } from '../metrics/metrics-basic.js';
 import { generateBasicAdvice } from '../advice/rules-basic.js';
 
@@ -61,7 +61,16 @@ export function init(root) {
       form.reset();
     } catch (err) {
       console.error(err);
-      if (session) await updateSessionStatus(session.id, 'error');
+      if (session) {
+        await updateSessionStatus(session.id, 'error');
+        // Phase 1には再解析機能がないため、失敗したセッションの動画をOPFSに
+        // 残しても使い道がない。孤立データとして残らないよう削除しておく。
+        try {
+          await deleteVideoBlob(session.id);
+        } catch (cleanupErr) {
+          console.warn('failed to clean up orphaned video blob', cleanupErr);
+        }
+      }
       setStatus(`エラーが発生しました: ${err.message || err}`, true);
     } finally {
       submitBtn.disabled = false;

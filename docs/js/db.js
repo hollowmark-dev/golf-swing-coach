@@ -109,6 +109,7 @@ export async function listMetricsForAngle(cameraAngle, excludeSessionId) {
   for (const session of sessions) {
     if (session.id === excludeSessionId) continue;
     if (session.cameraAngle !== cameraAngle) continue;
+    if (session.status !== 'done') continue; // 失敗/未完了セッションの指標は比較対象に含めない
     const record = await db.get('metrics', session.id);
     if (record) {
       results.push({ sessionId: session.id, createdAt: session.createdAt, values: record.values });
