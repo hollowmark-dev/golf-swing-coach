@@ -22,14 +22,15 @@
     <section class="view view-capture">
       <h2>スイングを撮影・取り込み</h2>
       <p class="hint">
-        スマホの純正カメラアプリで<strong>スローモーション(120fps以上)</strong>で撮影した動画を選んでください。
+        先にスマホの<strong>純正カメラアプリ</strong>で<strong>スローモーション(120fps以上)</strong>モードに切り替えて撮影しておいてください。
         通常の速度で撮った動画では、インパクトの瞬間が数フレームしか記録されず、精度が出ません。
+        撮影が終わったらこの画面に戻り、下のボタンから今撮った動画(またはギャラリー内の動画)を選んでください。
       </p>
 
       <form id="capture-form">
         <label class="field">
           <span>動画ファイル</span>
-          <input type="file" id="video-input" accept="video/*" capture="environment" required />
+          <input type="file" id="video-input" accept="video/*" required />
         </label>
 
         <label class="field">
